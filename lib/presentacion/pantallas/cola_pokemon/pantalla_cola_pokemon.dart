@@ -119,21 +119,22 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
   }
 
   void agregarACola(PokemonCarta pokemon) {
-    if (_pokemonExisteGeneral(pokemon)) {
+    if (_pokemonExisteEnCola(pokemon) || _pokemonExisteEnBatalla(pokemon)) {
       mostrarMensaje('${pokemon.nombre} ya está registrado.', esError: true);
       return;
     }
 
     setState(() {
       cola.enqueue(pokemon);
-      batalla.add(pokemon);
+
       posicionEncontrada = -1;
       pokemonBuscado = null;
       buscarController.clear();
-      mensajeBatalla = '${pokemon.nombre} entró a la cola y a la batalla.';
+
+      mensajeBatalla = '${pokemon.nombre} entró a la cola de batalla.';
     });
 
-    mostrarMensaje('${pokemon.nombre} agregado a la cola y batalla.');
+    mostrarMensaje('${pokemon.nombre} agregado a la cola.');
   }
 
   void agregarABatalla(PokemonCarta pokemon) {
@@ -180,14 +181,31 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
   }
 
   void retirarSiguiente() {
-    final PokemonCarta? eliminado = cola.dequeue();
+    final PokemonCarta? pokemon = cola.dequeue();
+
+    if (pokemon == null) {
+      setState(() {
+        mensajeBatalla = 'No hay Pokémon en la cola.';
+      });
+      return;
+    }
+
+    if (_pokemonExisteEnBatalla(pokemon)) {
+      setState(() {
+        mensajeBatalla = '${pokemon.nombre} ya está en batalla.';
+      });
+      return;
+    }
 
     setState(() {
+      batalla.add(pokemon);
+
       posicionEncontrada = -1;
-      mensajeBatalla = eliminado == null
-          ? 'No hay Pokémon en la cola.'
-          : '${eliminado.nombre} salió de la cola.';
+
+      mensajeBatalla = '${pokemon.nombre} fue enviado a batalla.';
     });
+
+    mostrarMensaje('${pokemon.nombre} enviado a batalla.');
   }
 
   void quitarDeBatalla(PokemonCarta pokemon) {
@@ -250,7 +268,9 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
     PokemonCarta? atacante;
 
     if (batalla.isNotEmpty) {
-      atacante = batalla.first;
+      atacante = batalla.removeAt(0);
+
+      batalla.add(atacante);
     } else {
       atacante = cola.atacarYRotar();
     }
@@ -269,6 +289,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
       ultimoDanio = danio;
       mostrarDanio = true;
       posicionEncontrada = -1;
+
       mensajeBatalla = '${atacante!.nombre} está atacando...';
     });
 
@@ -276,11 +297,12 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
 
     setState(() {
       vidaEnemigo = nuevaVida < 0 ? 0 : nuevaVida;
+
       mensajeBatalla = '${atacante!.nombre} hizo $danio de daño.';
 
       if (vidaEnemigo == 0) {
-        mensajeBatalla =
-            '${atacante.nombre} derrotó al enemigo. Se reinicia la batalla.';
+        mensajeBatalla = '${atacante.nombre} derrotó al enemigo.';
+
         vidaEnemigo = vidaMaximaEnemigo;
       }
     });
@@ -536,7 +558,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
                         child: FilledButton.icon(
                           onPressed: retirarSiguiente,
                           icon: const Icon(Icons.remove_rounded),
-                          label: const Text('Atender siguiente'),
+                          label: const Text('Mandar a batalla'),
                           style: FilledButton.styleFrom(
                             backgroundColor: ColoresApp.secundario,
                           ),
