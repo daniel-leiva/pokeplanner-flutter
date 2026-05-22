@@ -87,10 +87,6 @@ class ServicioPokeapi {
     return _mapearPokemonDetalle(datos, valorBusqueda);
   }
 
-  Future<Pokemon> obtenerPokemonCartaDetalle(String nombreOId) async {
-    return obtenerPokemonDetalle(nombreOId);
-  }
-
   Future<RelacionesDanioTipo> obtenerRelacionesDanioTipo(String tipo) async {
     final String tipoNormalizado = tipo.trim().toLowerCase();
 
