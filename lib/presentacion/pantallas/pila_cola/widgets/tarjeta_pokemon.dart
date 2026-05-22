@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:proyecto_final_progra3/dominio/entidades/pokemon_carta.dart';
+import 'package:proyecto_final_progra3/dominio/entidades/pokemon.dart';
 import 'package:proyecto_final_progra3/nucleo/tema/colores_app.dart';
+import 'package:proyecto_final_progra3/nucleo/utilidades/imagen_pokemon_helper.dart';
+import 'package:proyecto_final_progra3/presentacion/widgets/imagen_pokemon.dart';
 
 class TarjetaPokemon extends StatelessWidget {
   const TarjetaPokemon({
@@ -10,14 +12,13 @@ class TarjetaPokemon extends StatelessWidget {
     this.etiqueta,
   });
 
-  final PokemonCarta pokemon;
+  final Pokemon pokemon;
   final bool resaltado;
   final String? etiqueta;
 
   Color _colorTipo(String tipo) {
     switch (tipo.toLowerCase()) {
       case 'fuego':
-      case 'eléctrico':
       case 'electrico':
         return ColoresApp.acento;
       case 'agua':
@@ -29,11 +30,19 @@ class TarjetaPokemon extends StatelessWidget {
     }
   }
 
+  String _formatearTipo(String tipo) {
+    if (tipo.isEmpty) {
+      return 'Normal';
+    }
+
+    return tipo[0].toUpperCase() + tipo.substring(1).toLowerCase();
+  }
+
   Widget _stat(String label, int value, Color color) {
     final double porcentaje = (value / 100).clamp(0.0, 1.0);
 
     return Column(
-      children: [
+      children: <Widget>[
         Text(
           label,
           style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
@@ -72,7 +81,12 @@ class TarjetaPokemon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color colorTipo = _colorTipo(pokemon.tipo);
+    final String tipoPrincipal = pokemon.tipoPrincipal;
+    final Color colorTipo = _colorTipo(tipoPrincipal);
+    final ReferenciasImagenPokemon? referencias =
+        ImagenPokemonHelper.obtenerReferenciasDesdeUrl(pokemon.url);
+    final String identificador =
+        pokemon.id?.toString().padLeft(3, '0') ?? '---';
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -82,7 +96,7 @@ class TarjetaPokemon extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [colorTipo.withValues(alpha: 0.2), ColoresApp.tarjeta],
+          colors: <Color>[colorTipo.withValues(alpha: 0.2), ColoresApp.tarjeta],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -93,7 +107,7 @@ class TarjetaPokemon extends StatelessWidget {
               : ColoresApp.secundario.withValues(alpha: 0.45),
           width: resaltado ? 3 : 1.5,
         ),
-        boxShadow: [
+        boxShadow: <BoxShadow>[
           BoxShadow(
             color: ColoresApp.secundario.withValues(alpha: 0.14),
             blurRadius: 18,
@@ -103,11 +117,11 @@ class TarjetaPokemon extends StatelessWidget {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: [
+        children: <Widget>[
           Row(
-            children: [
+            children: <Widget>[
               Text(
-                '#${pokemon.id.toString().padLeft(3, '0')}',
+                '#$identificador',
                 style: TextStyle(color: colorTipo, fontWeight: FontWeight.w900),
               ),
               const Spacer(),
@@ -133,13 +147,11 @@ class TarjetaPokemon extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Image.network(
-            pokemon.imagenUrl,
-            height: 85,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              return Icon(Icons.catching_pokemon, size: 70, color: colorTipo);
-            },
+          ImagenPokemon(
+            imagenUrl: referencias?.urlPrincipal,
+            imagenFallbackUrl: referencias?.urlFallback,
+            tamano: 85,
+            radioBorde: 18,
           ),
           const SizedBox(height: 8),
           Text(
@@ -159,7 +171,7 @@ class TarjetaPokemon extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              pokemon.tipo,
+              _formatearTipo(tipoPrincipal),
               style: TextStyle(color: colorTipo, fontWeight: FontWeight.bold),
             ),
           ),
@@ -172,7 +184,7 @@ class TarjetaPokemon extends StatelessWidget {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
+              children: <Widget>[
                 _stat('HP', pokemon.hp, ColoresApp.secundario),
                 _stat('ATK', pokemon.ataque, ColoresApp.primario),
                 _stat('DEF', pokemon.defensa, ColoresApp.secundario),

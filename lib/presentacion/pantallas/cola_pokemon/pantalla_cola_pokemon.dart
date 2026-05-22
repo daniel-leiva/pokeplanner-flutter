@@ -3,10 +3,12 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:proyecto_final_progra3/datos/servicios/servicio_pokeapi.dart';
 import 'package:proyecto_final_progra3/dominio/entidades/pokemon.dart';
-import 'package:proyecto_final_progra3/dominio/entidades/pokemon_carta.dart';
 import 'package:proyecto_final_progra3/dominio/estructuras/cola_pokemon.dart';
 import 'package:proyecto_final_progra3/nucleo/tema/colores_app.dart';
+import 'package:proyecto_final_progra3/nucleo/utilidades/imagen_pokemon_helper.dart';
+import 'package:proyecto_final_progra3/presentacion/pantallas/pila_cola/pokemon_demo.dart';
 import 'package:proyecto_final_progra3/presentacion/pantallas/pila_cola/widgets/tarjeta_pokemon.dart';
+import 'package:proyecto_final_progra3/presentacion/widgets/imagen_pokemon.dart';
 
 class PantallaColaPokemon extends StatefulWidget {
   const PantallaColaPokemon({super.key});
@@ -17,12 +19,8 @@ class PantallaColaPokemon extends StatefulWidget {
 
 class _PantallaColaPokemonState extends State<PantallaColaPokemon>
     with SingleTickerProviderStateMixin {
-  static final ColaPokemon _colaCompartida = ColaPokemon();
-  static final List<PokemonCarta> _batallaCompartida = <PokemonCarta>[];
-
-  ColaPokemon get cola => _colaCompartida;
-  List<PokemonCarta> get batalla => _batallaCompartida;
-
+  final ColaPokemon cola = ColaPokemon();
+  final List<Pokemon> batalla = <Pokemon>[];
   final ServicioPokeapi _servicioPokeapi = ServicioPokeapi();
   final TextEditingController buscarController = TextEditingController();
 
@@ -30,6 +28,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
 
   int posicionEncontrada = -1;
   int paginaActual = 0;
+  final Random _random = Random();
 
   static const int totalPokemones = 100;
   static const int pokemonesPorPagina = 20;
@@ -37,7 +36,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
   bool cargandoBusqueda = false;
   bool cargandoTodos = false;
 
-  PokemonCarta? pokemonBuscado;
+  Pokemon? pokemonBuscado;
 
   int vidaEnemigo = 300;
   final int vidaMaximaEnemigo = 300;
@@ -47,7 +46,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
 
   String mensajeBatalla = 'Agrega Pokémon a la cola o batalla para iniciar.';
 
-  final List<PokemonCarta> todosLosPokemones = <PokemonCarta>[];
+  final List<Pokemon> todosLosPokemones = <Pokemon>[];
 
   @override
   void initState() {
@@ -70,13 +69,13 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
       final List<Pokemon> lista = await _servicioPokeapi
           .obtenerPokemonesPaginados(limite: totalPokemones, offset: 0);
 
-      final List<PokemonCarta> cartas = <PokemonCarta>[];
+      final List<Pokemon> detalles = <Pokemon>[];
 
       for (final Pokemon pokemon in lista) {
         try {
-          final PokemonCarta carta = await _servicioPokeapi
-              .obtenerPokemonCartaDetalle(pokemon.nombre);
-          cartas.add(carta);
+          final Pokemon detalle = await _servicioPokeapi
+              .obtenerPokemonDetalle(pokemon.nombre);
+          detalles.add(detalle);
         } catch (_) {}
       }
 
@@ -85,7 +84,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
       setState(() {
         todosLosPokemones
           ..clear()
-          ..addAll(cartas);
+          ..addAll(detalles);
       });
     } catch (_) {
       mostrarMensaje('No se pudieron cargar los Pokémon.', esError: true);
@@ -98,27 +97,35 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
     }
   }
 
-  bool _pokemonExisteEnCola(PokemonCarta pokemon) {
+  List<Pokemon> _catalogoDisponible() {
+    if (todosLosPokemones.isNotEmpty) {
+      return todosLosPokemones;
+    }
+
+    return pokemonesDemoCola;
+  }
+
+  bool _pokemonExisteEnCola(Pokemon pokemon) {
     return cola.elementos.any(
-      (PokemonCarta item) =>
+      (Pokemon item) =>
           item.id == pokemon.id ||
           item.nombre.toLowerCase() == pokemon.nombre.toLowerCase(),
     );
   }
 
-  bool _pokemonExisteEnBatalla(PokemonCarta pokemon) {
+  bool _pokemonExisteEnBatalla(Pokemon pokemon) {
     return batalla.any(
-      (PokemonCarta item) =>
+      (Pokemon item) =>
           item.id == pokemon.id ||
           item.nombre.toLowerCase() == pokemon.nombre.toLowerCase(),
     );
   }
 
-  bool _pokemonExisteGeneral(PokemonCarta pokemon) {
+  bool _pokemonExisteGeneral(Pokemon pokemon) {
     return _pokemonExisteEnCola(pokemon) || _pokemonExisteEnBatalla(pokemon);
   }
 
-  void agregarACola(PokemonCarta pokemon) {
+  void agregarACola(Pokemon pokemon) {
     if (_pokemonExisteEnCola(pokemon) || _pokemonExisteEnBatalla(pokemon)) {
       mostrarMensaje('${pokemon.nombre} ya está registrado.', esError: true);
       return;
@@ -137,7 +144,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
     mostrarMensaje('${pokemon.nombre} agregado a la cola.');
   }
 
-  void agregarABatalla(PokemonCarta pokemon) {
+  void agregarABatalla(Pokemon pokemon) {
     if (_pokemonExisteGeneral(pokemon)) {
       mostrarMensaje('${pokemon.nombre} ya está registrado.', esError: true);
       return;
@@ -154,45 +161,32 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
   }
 
   void agregarAleatorioACola() {
-    if (todosLosPokemones.isEmpty) {
-      mostrarMensaje(
-        'Espera a que se carguen los Pokémon disponibles.',
-        esError: true,
-      );
-      return;
-    }
-
-    final List<PokemonCarta> disponibles = todosLosPokemones
-        .where((PokemonCarta pokemon) => !_pokemonExisteGeneral(pokemon))
+    final List<Pokemon> disponibles = _catalogoDisponible()
+        .where((Pokemon pokemon) => !_pokemonExisteGeneral(pokemon))
         .toList();
 
     if (disponibles.isEmpty) {
       mostrarMensaje(
-        'Ya agregaste todos los Pokémon disponibles.',
+        todosLosPokemones.isEmpty
+            ? 'Ya agregaste todos los Pokémon de demostración.'
+            : 'Ya agregaste todos los Pokémon disponibles.',
         esError: true,
       );
       return;
     }
 
-    final PokemonCarta seleccionado =
-        disponibles[Random().nextInt(disponibles.length)];
+    final Pokemon seleccionado =
+        disponibles[_random.nextInt(disponibles.length)];
 
     agregarACola(seleccionado);
   }
 
   void retirarSiguiente() {
-    final PokemonCarta? pokemon = cola.dequeue();
+    final Pokemon? pokemon = cola.dequeue();
 
     if (pokemon == null) {
       setState(() {
         mensajeBatalla = 'No hay Pokémon en la cola.';
-      });
-      return;
-    }
-
-    if (_pokemonExisteEnBatalla(pokemon)) {
-      setState(() {
-        mensajeBatalla = '${pokemon.nombre} ya está en batalla.';
       });
       return;
     }
@@ -208,9 +202,9 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
     mostrarMensaje('${pokemon.nombre} enviado a batalla.');
   }
 
-  void quitarDeBatalla(PokemonCarta pokemon) {
+  void quitarDeBatalla(Pokemon pokemon) {
     setState(() {
-      batalla.removeWhere((PokemonCarta item) => item.id == pokemon.id);
+      batalla.removeWhere((Pokemon item) => item.id == pokemon.id);
       mensajeBatalla = '${pokemon.nombre} fue retirado de batalla.';
     });
   }
@@ -230,8 +224,8 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
     });
 
     try {
-      final PokemonCarta carta = await _servicioPokeapi
-          .obtenerPokemonCartaDetalle(nombre);
+      final Pokemon carta = await _servicioPokeapi
+          .obtenerPokemonDetalle(nombre);
 
       if (!mounted) return;
 
@@ -265,7 +259,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
   }
 
   Future<void> atacar() async {
-    PokemonCarta? atacante;
+    Pokemon? atacante;
 
     if (batalla.isNotEmpty) {
       atacante = batalla.removeAt(0);
@@ -316,12 +310,12 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
     }
   }
 
-  List<PokemonCarta> _obtenerPaginaActual() {
+  List<Pokemon> _obtenerPaginaActual() {
     final int inicio = paginaActual * pokemonesPorPagina;
     final int fin = inicio + pokemonesPorPagina;
 
     if (inicio >= todosLosPokemones.length) {
-      return <PokemonCarta>[];
+      return <Pokemon>[];
     }
 
     return todosLosPokemones.sublist(
@@ -347,7 +341,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
     );
   }
 
-  void mostrarDetalleCarta(PokemonCarta pokemon) {
+  void mostrarDetalleCarta(Pokemon pokemon) {
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -372,7 +366,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
   }
 
   Widget _cartaClickeable({
-    required PokemonCarta pokemon,
+    required Pokemon pokemon,
     String? etiqueta,
     bool resaltado = false,
   }) {
@@ -615,7 +609,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
                       alignment: WrapAlignment.center,
                       spacing: 18,
                       runSpacing: 18,
-                      children: cola.elementos.map((PokemonCarta pokemon) {
+                      children: cola.elementos.map((Pokemon pokemon) {
                         final int index = cola.elementos.indexOf(pokemon);
 
                         return _cartaClickeable(
@@ -637,7 +631,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
   }
 
   Widget _construirPestanaBatalla() {
-    final PokemonCarta? atacante = batalla.isNotEmpty
+    final Pokemon? atacante = batalla.isNotEmpty
         ? batalla.first
         : cola.frente;
     final double porcentajeVida = vidaEnemigo / vidaMaximaEnemigo;
@@ -766,7 +760,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
                       alignment: WrapAlignment.center,
                       spacing: 18,
                       runSpacing: 18,
-                      children: batalla.map((PokemonCarta pokemon) {
+                      children: batalla.map((Pokemon pokemon) {
                         return Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -800,7 +794,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
   }
 
   Widget _construirPestanaTodos() {
-    final List<PokemonCarta> pagina = _obtenerPaginaActual();
+    final List<Pokemon> pagina = _obtenerPaginaActual();
     final int totalPaginas = _totalPaginas();
 
     return SafeArea(
@@ -896,7 +890,7 @@ class _PantallaColaPokemonState extends State<PantallaColaPokemon>
                         alignment: WrapAlignment.center,
                         spacing: 18,
                         runSpacing: 18,
-                        children: pagina.map((PokemonCarta pokemon) {
+                        children: pagina.map((Pokemon pokemon) {
                           final bool registrado = _pokemonExisteGeneral(
                             pokemon,
                           );
@@ -1012,10 +1006,21 @@ class _BarraVidaEnemigo extends StatelessWidget {
 class _TarjetaBatallaPokemon extends StatelessWidget {
   const _TarjetaBatallaPokemon({required this.pokemon});
 
-  final PokemonCarta pokemon;
+  final Pokemon pokemon;
+
+  String _formatearTipo(String tipo) {
+    if (tipo.isEmpty) {
+      return 'Normal';
+    }
+
+    return tipo[0].toUpperCase() + tipo.substring(1).toLowerCase();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final ReferenciasImagenPokemon? referencias =
+        ImagenPokemonHelper.obtenerReferenciasDesdeUrl(pokemon.url);
+
     return Container(
       width: 270,
       padding: const EdgeInsets.all(16),
@@ -1044,7 +1049,12 @@ class _TarjetaBatallaPokemon extends StatelessWidget {
               backgroundColor: ColoresApp.secundario,
             ),
           ),
-          Image.network(pokemon.imagenUrl, height: 90, fit: BoxFit.contain),
+          ImagenPokemon(
+            imagenUrl: referencias?.urlPrincipal,
+            imagenFallbackUrl: referencias?.urlFallback,
+            tamano: 90,
+            radioBorde: 18,
+          ),
           const SizedBox(height: 8),
           Text(
             pokemon.nombre,
@@ -1052,7 +1062,7 @@ class _TarjetaBatallaPokemon extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            pokemon.tipo,
+            _formatearTipo(pokemon.tipoPrincipal),
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),

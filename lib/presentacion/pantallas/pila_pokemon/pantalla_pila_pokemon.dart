@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:proyecto_final_progra3/datos/servicios/servicio_pokeapi.dart';
 import 'package:proyecto_final_progra3/dominio/entidades/pokemon.dart';
-import 'package:proyecto_final_progra3/dominio/entidades/pokemon_carta.dart';
-import 'package:proyecto_final_progra3/dominio/estructuras/pila_visual_pokemon.dart';
+import 'package:proyecto_final_progra3/dominio/estructuras/pila_pokemon.dart';
+import 'package:proyecto_final_progra3/presentacion/pantallas/pila_cola/pokemon_demo.dart';
 import 'package:proyecto_final_progra3/nucleo/tema/colores_app.dart';
 import 'package:proyecto_final_progra3/presentacion/pantallas/pila_cola/widgets/tarjeta_pokemon.dart';
 import 'dart:math';
@@ -17,15 +17,11 @@ class PantallaPilaPokemon extends StatefulWidget {
 }
 
 class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
-  static final PilaVisualPokemon _pilaCompartida = PilaVisualPokemon();
-
-  PilaVisualPokemon get pila => _pilaCompartida;
-
+  final PilaPokemon pila = PilaPokemon();
   final ServicioPokeapi _servicioPokeapi = ServicioPokeapi();
   final TextEditingController buscarController = TextEditingController();
 
   int indiceResaltado = -1;
-  int contador = 0;
   int paginaActual = 0;
 
   static const int totalPokemones = 100;
@@ -34,57 +30,11 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
   bool cargandoBusqueda = false;
   bool cargandoTodos = false;
 
-  PokemonCarta? pokemonBuscado;
+  Pokemon? pokemonBuscado;
   _CriterioOrdenCartas criterioOrden = _CriterioOrdenCartas.poderTotal;
 
-  final List<PokemonCarta> pokemones = const <PokemonCarta>[
-    PokemonCarta(
-      id: 1,
-      nombre: 'Bulbasaur',
-      tipo: 'Planta',
-      imagenUrl:
-          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png',
-      hp: 45,
-      ataque: 49,
-      defensa: 49,
-      velocidad: 45,
-    ),
-    PokemonCarta(
-      id: 4,
-      nombre: 'Charmander',
-      tipo: 'Fuego',
-      imagenUrl:
-          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/4.png',
-      hp: 39,
-      ataque: 52,
-      defensa: 43,
-      velocidad: 65,
-    ),
-    PokemonCarta(
-      id: 7,
-      nombre: 'Squirtle',
-      tipo: 'Agua',
-      imagenUrl:
-          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/7.png',
-      hp: 44,
-      ataque: 48,
-      defensa: 65,
-      velocidad: 43,
-    ),
-    PokemonCarta(
-      id: 25,
-      nombre: 'Pikachu',
-      tipo: 'Eléctrico',
-      imagenUrl:
-          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png',
-      hp: 35,
-      ataque: 55,
-      defensa: 40,
-      velocidad: 90,
-    ),
-  ];
 
-  final List<PokemonCarta> todosLosPokemones = <PokemonCarta>[];
+  final List<Pokemon> todosLosPokemones = <Pokemon>[];
 
   @override
   void initState() {
@@ -101,13 +51,13 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
       final List<Pokemon> lista = await _servicioPokeapi
           .obtenerPokemonesPaginados(limite: totalPokemones, offset: 0);
 
-      final List<PokemonCarta> cartas = <PokemonCarta>[];
+      final List<Pokemon> detalles = <Pokemon>[];
 
       for (final Pokemon pokemon in lista) {
         try {
-          final PokemonCarta carta = await _servicioPokeapi
-              .obtenerPokemonCartaDetalle(pokemon.nombre);
-          cartas.add(carta);
+          final Pokemon detalle = await _servicioPokeapi
+              .obtenerPokemonDetalle(pokemon.nombre);
+          detalles.add(detalle);
         } catch (_) {}
       }
 
@@ -116,7 +66,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
       setState(() {
         todosLosPokemones
           ..clear()
-          ..addAll(cartas);
+          ..addAll(detalles);
       });
     } catch (_) {
       mostrarMensaje('No se pudieron cargar los Pokémon.', esError: true);
@@ -129,59 +79,36 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
     }
   }
 
-  bool _pokemonYaExiste(PokemonCarta pokemon) {
+  bool _pokemonYaExiste(Pokemon pokemon) {
     return pila.elementos.any(
-      (PokemonCarta item) =>
+      (Pokemon item) =>
           item.id == pokemon.id ||
           item.nombre.toLowerCase() == pokemon.nombre.toLowerCase(),
     );
   }
 
   void insertar() {
-    if (todosLosPokemones.isEmpty) {
+    final List<Pokemon> disponibles = (todosLosPokemones.isNotEmpty
+            ? todosLosPokemones
+            : pokemonesDemoPila)
+        .where((Pokemon pokemon) => !_pokemonYaExiste(pokemon))
+        .toList();
+
+    if (disponibles.isEmpty) {
       mostrarMensaje(
-        'Espera a que se carguen los Pokémon disponibles.',
+        todosLosPokemones.isEmpty
+            ? 'Ya agregaste todos los Pokémon de demostración.'
+            : 'Ya agregaste todos los Pokémon disponibles.',
         esError: true,
       );
       return;
     }
 
-    if (pila.elementos.length >= todosLosPokemones.length) {
-      mostrarMensaje(
-        'Ya agregaste todos los Pokémon disponibles.',
-        esError: true,
-      );
-      return;
-    }
-
-    final Random random = Random();
-
-    PokemonCarta? pokemonDisponible;
-
-    int intentos = 0;
-
-    while (pokemonDisponible == null &&
-        intentos < todosLosPokemones.length * 2) {
-      final PokemonCarta pokemon =
-          todosLosPokemones[random.nextInt(todosLosPokemones.length)];
-
-      if (!_pokemonYaExiste(pokemon)) {
-        pokemonDisponible = pokemon;
-      }
-
-      intentos++;
-    }
-
-    if (pokemonDisponible == null) {
-      mostrarMensaje(
-        'No hay más Pokémon disponibles para agregar.',
-        esError: true,
-      );
-      return;
-    }
+    final Pokemon pokemonDisponible =
+        disponibles[Random().nextInt(disponibles.length)];
 
     setState(() {
-      pila.push(pokemonDisponible!);
+      pila.push(pokemonDisponible);
       indiceResaltado = -1;
     });
 
@@ -189,12 +116,18 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
   }
 
   void eliminar() {
+    final Pokemon? eliminado = pila.pop();
+
     setState(() {
-      pila.pop();
       indiceResaltado = -1;
     });
 
-    mostrarMensaje('Se quitó la última carta agregada.');
+    if (eliminado == null) {
+      mostrarMensaje('La pila está vacía.', esError: true);
+      return;
+    }
+
+    mostrarMensaje('${eliminado.nombre} fue retirado de la pila.');
   }
 
   Future<void> buscarPokemonApi() async {
@@ -212,8 +145,8 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
     });
 
     try {
-      final PokemonCarta carta = await _servicioPokeapi
-          .obtenerPokemonCartaDetalle(nombre);
+      final Pokemon carta = await _servicioPokeapi
+          .obtenerPokemonDetalle(nombre);
 
       if (!mounted) return;
 
@@ -236,7 +169,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
   }
 
   void agregarPokemonBuscado() {
-    final PokemonCarta? pokemon = pokemonBuscado;
+    final Pokemon? pokemon = pokemonBuscado;
 
     if (pokemon == null) {
       mostrarMensaje('Primero busca un Pokémon para agregarlo.', esError: true);
@@ -246,7 +179,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
     agregarCartaAlAlbum(pokemon);
   }
 
-  void agregarCartaAlAlbum(PokemonCarta pokemon) {
+  void agregarCartaAlAlbum(Pokemon pokemon) {
     if (_pokemonYaExiste(pokemon)) {
       mostrarMensaje(
         '${pokemon.nombre} ya está guardado en el álbum.',
@@ -282,22 +215,22 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
     }
   }
 
-  List<PokemonCarta> _obtenerCartasOrdenadas() {
-    final List<PokemonCarta> cartas = pila.elementos.toList();
+  List<Pokemon> _obtenerCartasOrdenadas() {
+    final List<Pokemon> cartas = pila.elementos.toList();
 
-    cartas.sort((PokemonCarta a, PokemonCarta b) {
+    cartas.sort((Pokemon a, Pokemon b) {
       return _valorOrden(b).compareTo(_valorOrden(a));
     });
 
     return cartas;
   }
 
-  List<PokemonCarta> _obtenerPaginaActual() {
+  List<Pokemon> _obtenerPaginaActual() {
     final int inicio = paginaActual * pokemonesPorPagina;
     final int fin = inicio + pokemonesPorPagina;
 
     if (inicio >= todosLosPokemones.length) {
-      return <PokemonCarta>[];
+      return <Pokemon>[];
     }
 
     return todosLosPokemones.sublist(
@@ -312,7 +245,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
     return (todosLosPokemones.length / pokemonesPorPagina).ceil();
   }
 
-  int _valorOrden(PokemonCarta pokemon) {
+  int _valorOrden(Pokemon pokemon) {
     switch (criterioOrden) {
       case _CriterioOrdenCartas.vida:
         return pokemon.hp;
@@ -353,7 +286,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
     );
   }
 
-  void mostrarDetalleCarta(PokemonCarta pokemon) {
+  void mostrarDetalleCarta(Pokemon pokemon) {
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -378,7 +311,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
   }
 
   Widget _cartaClickeable({
-    required PokemonCarta pokemon,
+    required Pokemon pokemon,
     String? etiqueta,
     bool resaltado = false,
   }) {
@@ -430,7 +363,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
   }
 
   Widget _construirPestanaPila() {
-    final List<PokemonCarta> elementos = pila.elementos.reversed.toList();
+    final List<Pokemon> elementos = pila.obtenerElementos();
 
     return SafeArea(
       child: ListView(
@@ -608,9 +541,8 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
                       alignment: WrapAlignment.center,
                       spacing: 18,
                       runSpacing: 18,
-                      children: elementos.map((PokemonCarta pokemon) {
+                      children: elementos.map((Pokemon pokemon) {
                         final int index = elementos.indexOf(pokemon);
-                        final int indiceReal = pila.elementos.indexOf(pokemon);
 
                         return TweenAnimationBuilder<double>(
                           tween: Tween(begin: 0.86, end: 1),
@@ -629,7 +561,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
                               },
                           child: _cartaClickeable(
                             pokemon: pokemon,
-                            resaltado: indiceReal == indiceResaltado,
+                            resaltado: index == indiceResaltado,
                             etiqueta: index == 0 ? 'Último' : null,
                           ),
                         );
@@ -645,7 +577,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
   }
 
   Widget _construirPestanaAlbum() {
-    final List<PokemonCarta> cartasOrdenadas = _obtenerCartasOrdenadas();
+    final List<Pokemon> cartasOrdenadas = _obtenerCartasOrdenadas();
 
     return SafeArea(
       child: ListView(
@@ -673,7 +605,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<_CriterioOrdenCartas>(
-                    value: criterioOrden,
+                    initialValue: criterioOrden,
                     decoration: InputDecoration(
                       labelText: 'Criterio de ordenamiento',
                       border: OutlineInputBorder(
@@ -745,7 +677,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
                       alignment: WrapAlignment.center,
                       spacing: 18,
                       runSpacing: 18,
-                      children: cartasOrdenadas.map((PokemonCarta pokemon) {
+                      children: cartasOrdenadas.map((Pokemon pokemon) {
                         return _cartaClickeable(
                           pokemon: pokemon,
                           etiqueta: '${_valorOrden(pokemon)} pts',
@@ -762,7 +694,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
   }
 
   Widget _construirPestanaTodos() {
-    final List<PokemonCarta> pagina = _obtenerPaginaActual();
+    final List<Pokemon> pagina = _obtenerPaginaActual();
     final int totalPaginas = _totalPaginas();
 
     return SafeArea(
@@ -858,7 +790,7 @@ class _PantallaPilaPokemonState extends State<PantallaPilaPokemon> {
                         alignment: WrapAlignment.center,
                         spacing: 18,
                         runSpacing: 18,
-                        children: pagina.map((PokemonCarta pokemon) {
+                        children: pagina.map((Pokemon pokemon) {
                           final bool yaGuardado = _pokemonYaExiste(pokemon);
 
                           return Column(

@@ -2,10 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:proyecto_final_progra3/datos/modelos/modelo_pokemon.dart';
-import 'package:proyecto_final_progra3/datos/modelos/modelo_pokemon_detalle.dart';
 import 'package:proyecto_final_progra3/datos/modelos/modelo_relaciones_danio_tipo.dart';
 import 'package:proyecto_final_progra3/dominio/entidades/pokemon.dart';
-import 'package:proyecto_final_progra3/dominio/entidades/pokemon_carta.dart';
 import 'package:proyecto_final_progra3/dominio/entidades/relaciones_danio_tipo.dart';
 import 'package:proyecto_final_progra3/dominio/estructuras/arbol_pokemon.dart';
 import 'package:proyecto_final_progra3/nucleo/configuracion/configuracion_api.dart';
@@ -86,74 +84,11 @@ class ServicioPokeapi {
     final Map<String, dynamic> datos =
         json.decode(respuesta.body) as Map<String, dynamic>;
 
-    return ModeloPokemonDetalle.fromJson(
-      datos,
-      urlBasePokemon: obtenerUrlPokemon(),
-    ).aEntidad();
+    return _mapearPokemonDetalle(datos, valorBusqueda);
   }
 
-  Future<PokemonCarta> obtenerPokemonCartaDetalle(String nombreOId) async {
-    final String valorBusqueda = nombreOId.trim().toLowerCase();
-
-    if (valorBusqueda.isEmpty) {
-      throw Exception('Debes ingresar un Pokemon valido.');
-    }
-
-    final Uri url = Uri.parse('${obtenerUrlPokemon()}/$valorBusqueda');
-
-    final http.Response respuesta = await http.get(url);
-
-    if (respuesta.statusCode != 200) {
-      throw Exception('No se pudo obtener el detalle del Pokemon solicitado.');
-    }
-
-    final Map<String, dynamic> datos =
-        json.decode(respuesta.body) as Map<String, dynamic>;
-
-    int obtenerStat(String nombreStat) {
-      final List<dynamic> stats = datos['stats'] as List<dynamic>? ?? [];
-
-      for (final dynamic item in stats) {
-        final Map<String, dynamic> statItem = item as Map<String, dynamic>;
-
-        final Map<String, dynamic> stat =
-            statItem['stat'] as Map<String, dynamic>? ?? <String, dynamic>{};
-
-        if (stat['name'] == nombreStat) {
-          return statItem['base_stat'] as int? ?? 50;
-        }
-      }
-
-      return 50;
-    }
-
-    final List<dynamic> tipos = datos['types'] as List<dynamic>? ?? [];
-
-    String tipo = 'normal';
-
-    if (tipos.isNotEmpty) {
-      final Map<String, dynamic> tipoItem = tipos.first as Map<String, dynamic>;
-
-      final Map<String, dynamic> tipoDatos =
-          tipoItem['type'] as Map<String, dynamic>? ?? <String, dynamic>{};
-
-      tipo = tipoDatos['name'] as String? ?? 'normal';
-    }
-
-    final int id = datos['id'] as int? ?? 0;
-    final String nombre = datos['name'] as String? ?? valorBusqueda;
-
-    return PokemonCarta(
-      id: id,
-      nombre: _capitalizar(nombre),
-      tipo: _capitalizar(tipo),
-      imagenUrl:
-          'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$id.png',
-      hp: obtenerStat('hp'),
-      ataque: obtenerStat('attack'),
-      defensa: obtenerStat('defense'),
-      velocidad: obtenerStat('speed'),
-    );
+  Future<Pokemon> obtenerPokemonCartaDetalle(String nombreOId) async {
+    return obtenerPokemonDetalle(nombreOId);
   }
 
   Future<RelacionesDanioTipo> obtenerRelacionesDanioTipo(String tipo) async {
@@ -248,11 +183,66 @@ class ServicioPokeapi {
     );
   }
 
-  String _capitalizar(String texto) {
-    if (texto.isEmpty) {
-      return texto;
+  Pokemon _mapearPokemonDetalle(
+    Map<String, dynamic> datos,
+    String valorBusqueda,
+  ) {
+    final int id = (datos['id'] as num?)?.toInt() ?? 0;
+    final String nombre = (datos['name'] as String? ?? valorBusqueda)
+        .trim()
+        .toLowerCase();
+    final List<String> tipos = _extraerTipos(datos['types']);
+    final String url = id > 0
+        ? '${obtenerUrlPokemon()}/$id'
+        : '${obtenerUrlPokemon()}/$nombre';
+
+    return Pokemon(
+      id: id,
+      nombre: nombre,
+      url: url,
+      tipos: tipos,
+      hp: _obtenerStat(datos, 'hp'),
+      ataque: _obtenerStat(datos, 'attack'),
+      defensa: _obtenerStat(datos, 'defense'),
+      velocidad: _obtenerStat(datos, 'speed'),
+    );
+  }
+
+  List<String> _extraerTipos(dynamic tiposJson) {
+    if (tiposJson is! List<dynamic>) {
+      return <String>[];
     }
 
-    return '${texto[0].toUpperCase()}${texto.substring(1)}';
+    final List<Map<String, dynamic>> entradasOrdenadas =
+        tiposJson.whereType<Map<String, dynamic>>().toList()..sort((a, b) {
+          final int ordenA = (a['slot'] as num?)?.toInt() ?? 999;
+          final int ordenB = (b['slot'] as num?)?.toInt() ?? 999;
+          return ordenA.compareTo(ordenB);
+        });
+
+    return entradasOrdenadas
+        .map((Map<String, dynamic> item) {
+          final Map<String, dynamic> tipo =
+              item['type'] as Map<String, dynamic>? ?? <String, dynamic>{};
+          return (tipo['name'] as String? ?? '').toLowerCase();
+        })
+        .where((String tipo) => tipo.isNotEmpty)
+        .toList();
+  }
+
+  int _obtenerStat(Map<String, dynamic> datos, String nombreStat) {
+    final List<dynamic> stats = datos['stats'] as List<dynamic>? ?? [];
+
+    for (final dynamic item in stats) {
+      final Map<String, dynamic> statItem = item as Map<String, dynamic>;
+      final Map<String, dynamic> stat =
+          statItem['stat'] as Map<String, dynamic>? ?? <String, dynamic>{};
+
+      if (stat['name'] == nombreStat) {
+        return (statItem['base_stat'] as num?)?.toInt() ?? 0;
+      }
+    }
+
+    return 0;
   }
 }
