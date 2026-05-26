@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:proyecto_final_progra3/nucleo/tema/tema_app.dart';
-import 'package:proyecto_final_progra3/presentacion/pantallas/pantalla_inicio.dart';
+import 'package:proyecto_final_progra3/presentacion/pantallas/autenticacion/pantalla_control_autenticacion.dart';
 
 class AplicacionPrincipal extends StatelessWidget {
   const AplicacionPrincipal({super.key});
@@ -11,7 +11,7 @@ class AplicacionPrincipal extends StatelessWidget {
       title: 'PokéPlanner',
       debugShowCheckedModeBanner: false,
       theme: TemaApp.temaClaro,
-      home: const PantallaInicio(),
+      home: const PantallaControlAutenticacion(),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:proyecto_final_progra3/datos/servicios/servicio_auth_firebase.dart';
 import 'package:proyecto_final_progra3/nucleo/tema/colores_app.dart';
 import 'package:proyecto_final_progra3/presentacion/pantallas/arbol_pokemon/pantalla_arbol_pokemon.dart';
 import 'package:proyecto_final_progra3/presentacion/pantallas/cola_pokemon/pantalla_cola_pokemon.dart';
@@ -6,13 +7,56 @@ import 'package:proyecto_final_progra3/presentacion/pantallas/lista_pokemon/pant
 import 'package:proyecto_final_progra3/presentacion/pantallas/pila_pokemon/pantalla_pila_pokemon.dart';
 import 'package:proyecto_final_progra3/presentacion/pantallas/tabla_hash_pokemon/pantalla_tabla_hash_pokemon.dart';
 
-class PantallaInicio extends StatelessWidget {
+class PantallaInicio extends StatefulWidget {
   const PantallaInicio({super.key});
+
+  @override
+  State<PantallaInicio> createState() => _PantallaInicioState();
+}
+
+class _PantallaInicioState extends State<PantallaInicio> {
+  final ServicioAuthFirebase _servicioAuth = ServicioAuthFirebase();
+
+  Future<void> _cerrarSesion() async {
+    try {
+      await _servicioAuth.cerrarSesion();
+    } on ExcepcionAutenticacion catch (error) {
+      _mostrarMensaje(error.mensaje, esError: true);
+    } catch (_) {
+      _mostrarMensaje(
+        'No se pudo cerrar sesion. Intentalo de nuevo.',
+        esError: true,
+      );
+    }
+  }
+
+  void _mostrarMensaje(String mensaje, {bool esError = false}) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensaje),
+        backgroundColor: esError ? Colors.red.shade700 : Colors.green.shade700,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('PokePlanner'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('PokePlanner'),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Cerrar sesion',
+            onPressed: _cerrarSesion,
+            icon: const Icon(Icons.logout_rounded),
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
