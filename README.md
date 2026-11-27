@@ -31,8 +31,8 @@ Para ejecutarlo, configura tu propio proyecto de Firebase para Android con Flutt
 ## Autor y colaboradores
 
 - **[Daniel Alejandro Arita Leiva](https://github.com/DanielLeivaUMG):** árbol evolutivo, autenticación, identidad visual y ajustes de integración.
-- **[Kevin](https://github.com/KevinGarcia14):** pila de cartas y cola de batalla.
-- **[Hetzon](https://github.com/HetzonL27):** lista enlazada, organizador de colecciones y base de integración con PokéAPI.
-- **[Alexys](https://github.com/alexys2006):** tabla hash, analizador de equipos y tipos.
+- **[Kevin García](https://github.com/KevinGarcia14):** pila de cartas y cola de batalla.
+- **[Hetzon Agustín](https://github.com/HetzonL27):** lista enlazada, organizador de colecciones y base de integración con PokéAPI.
+- **[Alexys Beza](https://github.com/alexys2006):** tabla hash, analizador de equipos y tipos.
 
 Las aportaciones se resumen a partir de la documentación y el historial del proyecto; la lista de integrantes se presenta con los nombres disponibles en esas fuentes.
